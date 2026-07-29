@@ -46,7 +46,8 @@ router.put('/matrix', (req, res) => {
 });
 
 router.get('/', (req, res) => {
-  res.json(db.prepare('SELECT id, name, is_system AS isSystem FROM roles ORDER BY is_system DESC, name').all());
+  const rows = db.prepare('SELECT id, name, is_system AS isSystem FROM roles ORDER BY is_system DESC, name').all();
+  res.json(rows.map((r) => ({ ...r, isSystem: !!r.isSystem })));
 });
 
 router.post('/', (req, res) => {

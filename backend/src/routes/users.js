@@ -24,7 +24,11 @@ router.get('/', requireSuperAdminOrAdmin, (req, res) => {
       ORDER BY u.name
     `).all();
   }
-  res.json(rows);
+  // better-sqlite3 returns 0/1 for boolean columns, not true JS booleans. Left uncoerced,
+  // a falsy `0` for isSuperAdmin would make `{u.isSuperAdmin && <span>...}` render the
+  // literal text "0" in the UI instead of nothing — coerce here so every consumer gets
+  // real booleans.
+  res.json(rows.map((r) => ({ ...r, isActive: !!r.isActive, isSuperAdmin: !!r.isSuperAdmin })));
 });
 
 router.post('/', requireSuperAdminOrAdmin, (req, res) => {

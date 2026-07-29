@@ -12,6 +12,24 @@ const SELECT = `
   JOIN projects p ON p.id = a.project_id
 `;
 
+// Powers the "who's on site today" summary tile row on the DPR landing page.
+// Gated by dashboard_dpr view (not attendance view) since that's the page that
+// consumes it — a user allowed to see the DPR landing page should see this.
+router.get('/summary/today', requirePermission('dashboard_dpr', 'view'), (req, res) => {
+  const date = req.query.date || new Date().toISOString().slice(0, 10);
+  const rows = db.prepare(`
+    SELECT p.name AS project_name, a.labour_category, a.headcount
+    FROM labour_attendance a
+    JOIN projects p ON p.id = a.project_id
+    WHERE a.attendance_date = ?
+  `).all(date);
+  const totalHeadcount = rows.reduce((sum, r) => sum + r.headcount, 0);
+  const projectsCovered = new Set(rows.map((r) => r.project_name)).size;
+  const byCategory = {};
+  for (const r of rows) byCategory[r.labour_category] = (byCategory[r.labour_category] || 0) + r.headcount;
+  res.json({ date, totalHeadcount, projectsCovered, byCategory, entries: rows.length });
+});
+
 router.get('/', requirePermission('attendance', 'view'), (req, res) => {
   const { q, projectId } = req.query;
   let sql = SELECT + ' WHERE 1=1';

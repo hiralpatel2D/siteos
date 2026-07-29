@@ -47,6 +47,62 @@ router.put('/:id', requirePermission('projects', 'edit'), (req, res) => {
   res.json({ ok: true });
 });
 
+// Project drill-down: one call aggregates everything the detail page needs — assigned
+// labour (attendance), recent DPR entries, and an invoicing/financial summary — so
+// clicking into a project reads like a real dashboard instead of a bare record.
+router.get('/:id/dashboard', requirePermission('projects', 'view'), (req, res) => {
+  const id = req.params.id;
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+
+  const recentDpr = db.prepare(`
+    SELECT id, report_date, weather, manpower_count, work_summary, issues
+    FROM dpr WHERE project_id = ? ORDER BY report_date DESC, id DESC LIMIT 5
+  `).all(id);
+
+  const recentAttendance = db.prepare(`
+    SELECT id, attendance_date, labour_category, headcount, wage_rate, total_amount
+    FROM labour_attendance WHERE project_id = ? ORDER BY attendance_date DESC, id DESC LIMIT 5
+  `).all(id);
+
+  const attendanceTotals = db.prepare(`
+    SELECT COALESCE(SUM(headcount), 0) AS totalHeadcountAllTime, COUNT(DISTINCT attendance_date) AS daysLogged
+    FROM labour_attendance WHERE project_id = ?
+  `).get(id);
+
+  const todayRow = db.prepare(`
+    SELECT COALESCE(SUM(headcount), 0) AS totalHeadcountToday
+    FROM labour_attendance WHERE project_id = ? AND attendance_date = ?
+  `).get(id, new Date().toISOString().slice(0, 10));
+
+  const recentInvoices = db.prepare(`
+    SELECT id, invoice_no, invoice_date, client_name, total_amount, status
+    FROM invoices WHERE project_id = ? ORDER BY invoice_date DESC, id DESC LIMIT 5
+  `).all(id);
+
+  const invoiceTotals = db.prepare(`
+    SELECT COALESCE(SUM(total_amount), 0) AS totalInvoiced,
+           COALESCE(SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END), 0) AS totalPaid,
+           COUNT(*) AS invoiceCount
+    FROM invoices WHERE project_id = ?
+  `).get(id);
+
+  const counts = {
+    dpr: db.prepare('SELECT COUNT(*) AS c FROM dpr WHERE project_id = ?').get(id).c,
+    inventoryTransactions: db.prepare('SELECT COUNT(*) AS c FROM inventory_transactions WHERE project_id = ?').get(id).c,
+    attendance: db.prepare('SELECT COUNT(*) AS c FROM labour_attendance WHERE project_id = ?').get(id).c,
+    invoices: db.prepare('SELECT COUNT(*) AS c FROM invoices WHERE project_id = ?').get(id).c,
+  };
+
+  res.json({
+    project,
+    recentDpr,
+    labour: { recent: recentAttendance, ...attendanceTotals, totalHeadcountToday: todayRow.totalHeadcountToday },
+    invoicing: { recent: recentInvoices, ...invoiceTotals },
+    counts,
+  });
+});
+
 // Deleting a project cascades to its DPR/inventory/attendance/invoices (FK ON DELETE CASCADE) —
 // item #13: relationships must be respected, so we warn the caller how many linked rows exist.
 router.get('/:id/impact', requirePermission('projects', 'delete'), (req, res) => {
