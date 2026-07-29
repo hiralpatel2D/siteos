@@ -22,6 +22,17 @@ export function formatDate(isoDate) {
   return `${dd}-${mm}-${yyyy}`;
 }
 
+// DD-MM-YYYY plus the day name — used only on prominent single headers (e.g. the DPR
+// landing page date) so it reads naturally, never on dense table/card date fields
+// where the extra text would just be clutter.
+export function formatDateWithDay(isoDate) {
+  if (!isoDate) return '—';
+  const d = new Date(isoDate.length === 10 ? `${isoDate}T00:00:00` : isoDate);
+  if (Number.isNaN(d.getTime())) return isoDate;
+  const dayName = d.toLocaleDateString('en-IN', { weekday: 'short' });
+  return `${formatDate(isoDate)}, ${dayName}`;
+}
+
 // Today's date as ISO (YYYY-MM-DD), used for the delete-confirmation prompt and default form values.
 export function todayISO() {
   const d = new Date();
