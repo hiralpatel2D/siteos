@@ -1,0 +1,15 @@
+# Render "Blueprint" deploy config. Lets Render auto-configure everything from
+# this one file — on render.com, choose "New +" -> "Blueprint" and point it at
+# the GitHub repo containing this file; almost nothing needs to be typed by hand.
+services:
+  - type: web
+    name: siteos
+    env: node
+    plan: free
+    buildCommand: "cd frontend && npm install && npm run build && cd .. && rm -rf backend/public && cp -r frontend/dist backend/public && cd backend && npm install"
+    startCommand: "cd backend && npm start"
+    envVars:
+      - key: SITEOS_JWT_SECRET
+        generateValue: true
+      - key: NODE_VERSION
+        value: 20.11.0
