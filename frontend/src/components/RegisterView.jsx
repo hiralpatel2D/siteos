@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import ViewToggle from './ViewToggle';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
@@ -24,14 +24,46 @@ export default function RegisterView({
   getItemLabel,
   emptyLabel = 'No records yet.',
   extraToolbar = null,
+  headerExtra = null,
+  getImpact = null,
 }) {
   const { user, can, setViewPref } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
-  const [view, setView] = useState(user?.viewPrefs?.[moduleKey] || 'row');
+  // Respect an explicitly saved preference first. If the user has never chosen a
+  // view for this module, default to Cards on narrow (mobile) screens and Rows on
+  // wider ones — a row/table is genuinely hard to scan on a phone, Cards read
+  // better there, but we never override a preference the user actually picked.
+  const [view, setView] = useState(
+    user?.viewPrefs?.[moduleKey] || (typeof window !== 'undefined' && window.innerWidth < 640 ? 'card' : 'row')
+  );
+  const [tableScroll, setTableScroll] = useState({ atStart: true, atEnd: true, scrollable: false });
+  const tableScrollRef = useRef(null);
+
+  const updateTableScroll = useCallback((el) => {
+    if (!el) return;
+    const scrollable = el.scrollWidth > el.clientWidth + 2;
+    setTableScroll({
+      scrollable,
+      atStart: el.scrollLeft <= 2,
+      atEnd: el.scrollLeft >= el.scrollWidth - el.clientWidth - 2,
+    });
+  }, []);
+
+  // Re-check scrollability whenever the table's content or size changes (e.g. after
+  // data loads, or the window is resized/rotated) — not just on manual scroll.
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el || view !== 'row') return;
+    updateTableScroll(el);
+    const observer = new ResizeObserver(() => updateTableScroll(el));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [view, items, updateTableScroll]);
   const [formState, setFormState] = useState(null); // null | 'create' | item
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteImpact, setDeleteImpact] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [pendingClose, setPendingClose] = useState(false);
 
@@ -80,9 +112,18 @@ export default function RegisterView({
     await load();
   };
 
+  const openDelete = (item) => {
+    setDeleteTarget(item);
+    setDeleteImpact(null);
+    if (getImpact) {
+      getImpact(item.id).then(setDeleteImpact).catch(() => {});
+    }
+  };
+
   const handleDeleteConfirm = async (confirmDate) => {
     await api.remove(deleteTarget.id, confirmDate);
     setDeleteTarget(null);
+    setDeleteImpact(null);
     await load();
   };
 
@@ -90,6 +131,7 @@ export default function RegisterView({
 
   return (
     <div className="p-4 md:p-6">
+      {headerExtra}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
         <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -119,7 +161,12 @@ export default function RegisterView({
       {emptyState && <div className="text-sm text-gray-500 py-12 text-center border border-dashed rounded-xl bg-white">{emptyLabel}</div>}
 
       {!loading && items.length > 0 && view === 'row' && (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="relative">
+          <div
+            className="overflow-x-auto rounded-xl border border-gray-200 bg-white"
+            onScroll={(e) => updateTableScroll(e.currentTarget)}
+            ref={tableScrollRef}
+          >
           <table className="min-w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left text-gray-500">
@@ -143,7 +190,7 @@ export default function RegisterView({
                         <button onClick={() => setFormState(item)} className="text-blue-600 hover:underline mr-3 text-sm">Edit</button>
                       )}
                       {canDelete && (
-                        <button onClick={() => setDeleteTarget(item)} className="text-red-600 hover:underline text-sm">Delete</button>
+                        <button onClick={() => openDelete(item)} className="text-red-600 hover:underline text-sm">Delete</button>
                       )}
                     </td>
                   )}
@@ -151,6 +198,16 @@ export default function RegisterView({
               ))}
             </tbody>
           </table>
+          </div>
+          {tableScroll.scrollable && !tableScroll.atEnd && (
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 rounded-r-xl bg-gradient-to-l from-white to-transparent" />
+          )}
+          {tableScroll.scrollable && !tableScroll.atStart && (
+            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 rounded-l-xl bg-gradient-to-r from-white to-transparent" />
+          )}
+          {tableScroll.scrollable && (
+            <p className="mt-1 text-xs text-gray-400 md:hidden">← scroll for more →</p>
+          )}
         </div>
       )}
 
@@ -162,7 +219,7 @@ export default function RegisterView({
               {(canEdit || canDelete) && (
                 <div className="mt-2 pt-2 border-t border-gray-100 flex justify-end gap-3">
                   {canEdit && <button onClick={() => setFormState(item)} className="text-blue-600 hover:underline text-sm">Edit</button>}
-                  {canDelete && <button onClick={() => setDeleteTarget(item)} className="text-red-600 hover:underline text-sm">Delete</button>}
+                  {canDelete && <button onClick={() => openDelete(item)} className="text-red-600 hover:underline text-sm">Delete</button>}
                 </div>
               )}
             </div>
@@ -192,7 +249,8 @@ export default function RegisterView({
       {deleteTarget && (
         <ConfirmDeleteModal
           itemLabel={getItemLabel(deleteTarget)}
-          onCancel={() => setDeleteTarget(null)}
+          impact={deleteImpact}
+          onCancel={() => { setDeleteTarget(null); setDeleteImpact(null); }}
           onConfirm={handleDeleteConfirm}
         />
       )}
