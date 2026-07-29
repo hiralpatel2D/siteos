@@ -6,7 +6,7 @@ services:
     name: siteos
     env: node
     plan: free
-    buildCommand: "npm install -g npm@latest && cd frontend && rm -rf node_modules package-lock.json && npm install && npm run build && cd .. && rm -rf backend/public && cp -r frontend/dist backend/public && cd backend && rm -rf node_modules package-lock.json && npm install"
+    buildCommand: "cd frontend && rm -rf node_modules package-lock.json && npm install && npm run build && cd .. && rm -rf backend/public && cp -r frontend/dist backend/public && cd backend && rm -rf node_modules package-lock.json && npm install"
     startCommand: "cd backend && npm start"
     envVars:
       - key: SITEOS_JWT_SECRET
