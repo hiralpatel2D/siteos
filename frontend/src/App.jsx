@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import DprPage from './pages/DprPage';
 import ProjectsPage from './pages/ProjectsPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
 import InventoryPage from './pages/InventoryPage';
 import AttendancePage from './pages/AttendancePage';
 import InvoicingPage from './pages/InvoicingPage';
@@ -27,6 +28,7 @@ export default function App() {
             <Route index element={<Navigate to="/dpr" replace />} />
             <Route path="/dpr" element={<ProtectedRoute module="dashboard_dpr"><DprPage /></ProtectedRoute>} />
             <Route path="/projects" element={<ProtectedRoute module="projects"><ProjectsPage /></ProtectedRoute>} />
+            <Route path="/projects/:id" element={<ProtectedRoute module="projects"><ProjectDetailPage /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute module="inventory"><InventoryPage /></ProtectedRoute>} />
             <Route path="/attendance" element={<ProtectedRoute module="attendance"><AttendancePage /></ProtectedRoute>} />
             <Route path="/invoicing" element={<ProtectedRoute module="invoicing"><InvoicingPage /></ProtectedRoute>} />
