@@ -1,6 +1,14 @@
+import { Link } from 'react-router-dom';
 import RegisterView from '../components/RegisterView';
 import { projectsApi } from '../api/modules';
 import { formatDate, formatINR } from '../utils/format';
+
+const IMPACT_LABELS = {
+  dpr: 'DPR entries',
+  inventoryTransactions: 'inventory transactions',
+  attendance: 'attendance records',
+  invoices: 'invoices',
+};
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -34,8 +42,21 @@ export default function ProjectsPage() {
       api={api}
       emptyLabel="No projects yet — add your first site to start recording DPRs, inventory and invoices against it."
       getItemLabel={(item) => item.name}
+      getImpact={(id) => projectsApi.impact(id).then((counts) =>
+        Object.entries(counts)
+          .filter(([, count]) => count > 0)
+          .map(([key, count]) => ({ label: IMPACT_LABELS[key] || key, count }))
+      )}
       columns={[
-        { key: 'name', label: 'Project' },
+        {
+          key: 'name',
+          label: 'Project',
+          render: (i) => (
+            <Link to={`/projects/${i.id}`} className="font-medium text-blue-700 hover:underline">
+              {i.name}
+            </Link>
+          ),
+        },
         { key: 'code', label: 'Code' },
         { key: 'client_name', label: 'Client' },
         { key: 'location', label: 'Location' },
@@ -46,7 +67,7 @@ export default function ProjectsPage() {
       renderCard={(i) => (
         <>
           <div className="flex items-center justify-between">
-            <span className="font-medium text-gray-900">{i.name}</span>
+            <Link to={`/projects/${i.id}`} className="font-medium text-blue-700 hover:underline">{i.name}</Link>
             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 capitalize">{i.status.replace('_', ' ')}</span>
           </div>
           <p className="text-sm text-gray-600">{i.client_name} · {i.location}</p>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { usersApi, rolesApi } from '../api/modules';
 import { useAuth } from '../context/AuthContext';
 import ViewToggle from '../components/ViewToggle';
@@ -8,9 +8,28 @@ export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [query, setQuery] = useState('');
-  const [view, setView] = useState(user?.viewPrefs?.users || 'row');
+  // Same rule as RegisterView: respect a saved preference, otherwise default to
+  // whichever view reads best on the current screen size.
+  const [view, setView] = useState(
+    user?.viewPrefs?.users || (typeof window !== 'undefined' && window.innerWidth < 640 ? 'card' : 'row')
+  );
   const [modal, setModal] = useState(null); // null | 'create' | user
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [tableScroll, setTableScroll] = useState({ atStart: true, atEnd: true, scrollable: false });
+  const tableScrollRef = useRef(null);
+  const updateTableScroll = useCallback((el) => {
+    if (!el) return;
+    const scrollable = el.scrollWidth > el.clientWidth + 2;
+    setTableScroll({ scrollable, atStart: el.scrollLeft <= 2, atEnd: el.scrollLeft >= el.scrollWidth - el.clientWidth - 2 });
+  }, []);
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el || view !== 'row') return;
+    updateTableScroll(el);
+    const observer = new ResizeObserver(() => updateTableScroll(el));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [view, users, updateTableScroll]);
 
   const load = async () => {
     const [u, r] = await Promise.all([usersApi.list({ q: query || undefined }), rolesApi.list()]);
@@ -42,7 +61,12 @@ export default function UsersPage() {
       {users.length === 0 && <div className="text-sm text-gray-500 py-12 text-center border border-dashed rounded-xl bg-white">No users found.</div>}
 
       {users.length > 0 && view === 'row' && (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="relative">
+        <div
+          className="overflow-x-auto rounded-xl border border-gray-200 bg-white"
+          ref={tableScrollRef}
+          onScroll={(e) => updateTableScroll(e.currentTarget)}
+        >
           <table className="min-w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left text-gray-500">
@@ -56,7 +80,12 @@ export default function UsersPage() {
             <tbody className="divide-y divide-gray-100">
               {users.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2.5">{u.name}{u.isSuperAdmin ? <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Super Admin</span> : null}</td>
+                  <td className="px-4 py-2.5 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-2">
+                      {u.name}
+                      {u.isSuperAdmin && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 whitespace-nowrap">Super Admin</span>}
+                    </span>
+                  </td>
                   <td className="px-4 py-2.5">{u.email}</td>
                   <td className="px-4 py-2.5">{u.role}</td>
                   <td className="px-4 py-2.5">{u.isActive ? <span className="text-green-600">Active</span> : <span className="text-gray-400">Inactive</span>}</td>
@@ -69,6 +98,14 @@ export default function UsersPage() {
             </tbody>
           </table>
         </div>
+        {tableScroll.scrollable && !tableScroll.atEnd && (
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 rounded-r-xl bg-gradient-to-l from-white to-transparent" />
+        )}
+        {tableScroll.scrollable && !tableScroll.atStart && (
+          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 rounded-l-xl bg-gradient-to-r from-white to-transparent" />
+        )}
+        {tableScroll.scrollable && <p className="mt-1 text-xs text-gray-400 md:hidden">← scroll for more →</p>}
+        </div>
       )}
 
       {users.length > 0 && view === 'card' && (
@@ -77,7 +114,7 @@ export default function UsersPage() {
             <div key={u.id} className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-gray-900">{u.name}</span>
-                {u.isSuperAdmin && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Super Admin</span>}
+                {!!u.isSuperAdmin && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Super Admin</span>}
               </div>
               <p className="text-sm text-gray-600">{u.email}</p>
               <p className="text-xs text-gray-500">{u.role} · {u.isActive ? 'Active' : 'Inactive'}</p>

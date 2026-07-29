@@ -109,9 +109,10 @@ export default function RolesPermissionsPage() {
       </div>
       {error && <div className="mb-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</div>}
 
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-gray-500 mb-1">
         Super Admin and Admin always have full access and can't be edited here. Toggle checkboxes for other roles, then save.
       </p>
+      <p className="text-xs text-gray-400 mb-4 md:hidden">← Each table scrolls sideways to reach Delete →</p>
 
       <div className="space-y-6">
         {data.matrix.map((roleEntry) => (
