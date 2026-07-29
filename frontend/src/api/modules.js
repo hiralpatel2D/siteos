@@ -7,6 +7,7 @@ export const projectsApi = {
   update: (id, payload) => client.put(`/projects/${id}`, payload).then((r) => r.data),
   remove: (id, confirmDate) => client.delete(`/projects/${id}`, { data: { confirmDate } }).then((r) => r.data),
   impact: (id) => client.get(`/projects/${id}/impact`).then((r) => r.data),
+  dashboard: (id) => client.get(`/projects/${id}/dashboard`).then((r) => r.data),
 };
 
 export const dprApi = {
@@ -34,6 +35,7 @@ export const attendanceApi = {
   create: (payload) => client.post('/attendance', payload).then((r) => r.data),
   update: (id, payload) => client.put(`/attendance/${id}`, payload).then((r) => r.data),
   remove: (id, confirmDate) => client.delete(`/attendance/${id}`, { data: { confirmDate } }).then((r) => r.data),
+  todaySummary: () => client.get('/attendance/summary/today').then((r) => r.data),
 };
 
 export const invoicingApi = {
